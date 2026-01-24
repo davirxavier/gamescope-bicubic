@@ -685,103 +685,106 @@ namespace gamescope
 			return true;
 		}
 
-		virtual int Present( const FrameInfo_t *pFrameInfo, bool bAsync ) override
-		{
-            bool bNeedsFullComposite = false;
-
-            // TODO: Dedupe some of this composite check code between us and drm.cpp
-            bool bLayer0ScreenSize = close_enough(pFrameInfo->layers[0].scale.x, 1.0f) && close_enough(pFrameInfo->layers[0].scale.y, 1.0f);
-
-            bool bNeedsCompositeFromFilter = (g_upscaleFilter == GamescopeUpscaleFilter::NEAREST || g_upscaleFilter == GamescopeUpscaleFilter::PIXEL) && !bLayer0ScreenSize;
-
-            bNeedsFullComposite |= cv_composite_force;
-            bNeedsFullComposite |= pFrameInfo->useFSRLayer0;
-            bNeedsFullComposite |= pFrameInfo->useNISLayer0;
-            bNeedsFullComposite |= pFrameInfo->useBICUBICLayer0;
-            bNeedsFullComposite |= pFrameInfo->blurLayer0;
-            bNeedsFullComposite |= bNeedsCompositeFromFilter;
-            bNeedsFullComposite |= g_bColorSliderInUse;
-            bNeedsFullComposite |= pFrameInfo->bFadingOut;
-            bNeedsFullComposite |= !g_reshade_effect.empty();
-            bNeedsFullComposite |= !UsesModifiers();
-
-            if ( g_bOutputHDREnabled )
-                bNeedsFullComposite |= g_bHDRItmEnable;
-
-            if ( !SupportsColorManagement() )
-                bNeedsFullComposite |= ColorspaceIsHDR( pFrameInfo->layers[0].colorspace );
-
-            bNeedsFullComposite |= !!(g_uCompositeDebug & CompositeDebugFlag::Heatmap);
-
-            if ( !bNeedsFullComposite )
-            {
-                bool bNeedsBacking = true;
-                if ( pFrameInfo->layerCount >= 1 )
-                {
-                    if ( pFrameInfo->layers[0].isScreenSize() && ( !pFrameInfo->layers[0].hasAlpha() || cv_vr_transparent_backing ) )
-                        bNeedsBacking = false;
-                }
-
-                uint32_t uCurrentPlane = 0;
-                if ( bNeedsBacking )
-                {
-                    COpenVRPlane *pPlane = &m_Planes[uCurrentPlane++];
-                    pPlane->Present(
-                        OpenVRPlaneState
-                        {
-                            .pTexture    = m_pBlackTexture.get(),
-                            .flSrcWidth  = double( g_nOutputWidth ),
-                            .flSrcHeight = double( g_nOutputHeight ),
-                            .nDstWidth   = int32_t( g_nOutputWidth ),
-                            .nDstHeight  = int32_t( g_nOutputHeight ),
-                            .eColorspace = GAMESCOPE_APP_TEXTURE_COLORSPACE_PASSTHRU,
-                            .bOpaque     = !cv_vr_transparent_backing,
-                            .flAlpha     = cv_vr_transparent_backing ? 0.0f : 1.0f,
-                        } );
-                }
-
-                for ( int i = 0; i < 8 && uCurrentPlane < 8; i++ )
-                    m_Planes[uCurrentPlane++].Present( i < pFrameInfo->layerCount ? &pFrameInfo->layers[i] : nullptr );
-            }
-            else
-            {
-                std::optional oCompositeResult = vulkan_composite( (FrameInfo_t *)pFrameInfo, nullptr, false );
-                if ( !oCompositeResult )
-                {
-                    openvr_log.errorf( "vulkan_composite failed" );
-                    return -EINVAL;
-                }
-
-                vulkan_wait( *oCompositeResult, true );
-
-                FrameInfo_t::Layer_t compositeLayer{};
-                compositeLayer.scale.x = 1.0;
-                compositeLayer.scale.y = 1.0;
-                compositeLayer.opacity = 1.0;
-                compositeLayer.zpos = g_zposBase;
-
-                compositeLayer.tex = vulkan_get_last_output_image( false, false );
-                compositeLayer.applyColorMgmt = false;
-
-                compositeLayer.filter = GamescopeUpscaleFilter::NEAREST;
-                compositeLayer.ctm = nullptr;
-                compositeLayer.colorspace = pFrameInfo->outputEncodingEOTF == EOTF_PQ ? GAMESCOPE_APP_TEXTURE_COLORSPACE_HDR10_PQ : GAMESCOPE_APP_TEXTURE_COLORSPACE_SRGB;
-
-                GetPrimaryPlane()->Present( &compositeLayer );
-
-                for ( int i = 1; i < 8; i++ )
-                    m_Planes[i].Present( nullptr );
-            }
-
-
-            GetVBlankTimer().UpdateWasCompositing( true );
-            GetVBlankTimer().UpdateLastDrawTime( get_time_in_nanos() - g_SteamCompMgrVBlankTime.ulWakeupTime );
-
-            this->PollState();
-
-            return 0;
-		}
-
+// <<<<<<< HEAD
+// 		virtual int Present( const FrameInfo_t *pFrameInfo, bool bAsync ) override
+// 		{
+//             bool bNeedsFullComposite = false;
+//
+//             // TODO: Dedupe some of this composite check code between us and drm.cpp
+//             bool bLayer0ScreenSize = close_enough(pFrameInfo->layers[0].scale.x, 1.0f) && close_enough(pFrameInfo->layers[0].scale.y, 1.0f);
+//
+//             bool bNeedsCompositeFromFilter = (g_upscaleFilter == GamescopeUpscaleFilter::NEAREST || g_upscaleFilter == GamescopeUpscaleFilter::PIXEL) && !bLayer0ScreenSize;
+//
+//             bNeedsFullComposite |= cv_composite_force;
+//             bNeedsFullComposite |= pFrameInfo->useFSRLayer0;
+//             bNeedsFullComposite |= pFrameInfo->useNISLayer0;
+//             bNeedsFullComposite |= pFrameInfo->useBICUBICLayer0;
+//             bNeedsFullComposite |= pFrameInfo->blurLayer0;
+//             bNeedsFullComposite |= bNeedsCompositeFromFilter;
+//             bNeedsFullComposite |= g_bColorSliderInUse;
+//             bNeedsFullComposite |= pFrameInfo->bFadingOut;
+//             bNeedsFullComposite |= !g_reshade_effect.empty();
+//             bNeedsFullComposite |= !UsesModifiers();
+//
+//             if ( g_bOutputHDREnabled )
+//                 bNeedsFullComposite |= g_bHDRItmEnable;
+//
+//             if ( !SupportsColorManagement() )
+//                 bNeedsFullComposite |= ColorspaceIsHDR( pFrameInfo->layers[0].colorspace );
+//
+//             bNeedsFullComposite |= !!(g_uCompositeDebug & CompositeDebugFlag::Heatmap);
+//
+//             if ( !bNeedsFullComposite )
+//             {
+//                 bool bNeedsBacking = true;
+//                 if ( pFrameInfo->layerCount >= 1 )
+//                 {
+//                     if ( pFrameInfo->layers[0].isScreenSize() && ( !pFrameInfo->layers[0].hasAlpha() || cv_vr_transparent_backing ) )
+//                         bNeedsBacking = false;
+//                 }
+//
+//                 uint32_t uCurrentPlane = 0;
+//                 if ( bNeedsBacking )
+//                 {
+//                     COpenVRPlane *pPlane = &m_Planes[uCurrentPlane++];
+//                     pPlane->Present(
+//                         OpenVRPlaneState
+//                         {
+//                             .pTexture    = m_pBlackTexture.get(),
+//                             .flSrcWidth  = double( g_nOutputWidth ),
+//                             .flSrcHeight = double( g_nOutputHeight ),
+//                             .nDstWidth   = int32_t( g_nOutputWidth ),
+//                             .nDstHeight  = int32_t( g_nOutputHeight ),
+//                             .eColorspace = GAMESCOPE_APP_TEXTURE_COLORSPACE_PASSTHRU,
+//                             .bOpaque     = !cv_vr_transparent_backing,
+//                             .flAlpha     = cv_vr_transparent_backing ? 0.0f : 1.0f,
+//                         } );
+//                 }
+//
+//                 for ( int i = 0; i < 8 && uCurrentPlane < 8; i++ )
+//                     m_Planes[uCurrentPlane++].Present( i < pFrameInfo->layerCount ? &pFrameInfo->layers[i] : nullptr );
+//             }
+//             else
+//             {
+//                 std::optional oCompositeResult = vulkan_composite( (FrameInfo_t *)pFrameInfo, nullptr, false );
+//                 if ( !oCompositeResult )
+//                 {
+//                     openvr_log.errorf( "vulkan_composite failed" );
+//                     return -EINVAL;
+//                 }
+//
+//                 vulkan_wait( *oCompositeResult, true );
+//
+//                 FrameInfo_t::Layer_t compositeLayer{};
+//                 compositeLayer.scale.x = 1.0;
+//                 compositeLayer.scale.y = 1.0;
+//                 compositeLayer.opacity = 1.0;
+//                 compositeLayer.zpos = g_zposBase;
+//
+//                 compositeLayer.tex = vulkan_get_last_output_image( false, false );
+//                 compositeLayer.applyColorMgmt = false;
+//
+//                 compositeLayer.filter = GamescopeUpscaleFilter::NEAREST;
+//                 compositeLayer.ctm = nullptr;
+//                 compositeLayer.colorspace = pFrameInfo->outputEncodingEOTF == EOTF_PQ ? GAMESCOPE_APP_TEXTURE_COLORSPACE_HDR10_PQ : GAMESCOPE_APP_TEXTURE_COLORSPACE_SRGB;
+//
+//                 GetPrimaryPlane()->Present( &compositeLayer );
+//
+//                 for ( int i = 1; i < 8; i++ )
+//                     m_Planes[i].Present( nullptr );
+//             }
+//
+//
+//             GetVBlankTimer().UpdateWasCompositing( true );
+//             GetVBlankTimer().UpdateLastDrawTime( get_time_in_nanos() - g_SteamCompMgrVBlankTime.ulWakeupTime );
+//
+//             this->PollState();
+//
+//             return 0;
+// 		}
+//
+// =======
+// >>>>>>> 1164ac17849b0c50a39d286e8feda877d82bb59a
 		virtual void DirtyState( bool bForce, bool bForceModeset ) override
 		{
 		}
