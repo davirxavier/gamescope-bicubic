@@ -5,6 +5,7 @@
 #include <atomic>
 #include <stdint.h>
 #include <memory>
+#include <map>
 #include <unordered_map>
 #include <array>
 #include <bitset>
@@ -265,6 +266,17 @@ inline bool close_enough(float a, float b, float epsilon = 0.001f)
 
 bool DRMFormatHasAlpha( uint32_t nDRMFormat );
 
+enum AlphaBlendingMode_t
+{
+	ALPHA_BLENDING_MODE_PREMULTIPLIED,
+	ALPHA_BLENDING_MODE_COVERAGE,
+	ALPHA_BLENDING_MODE_NONE,
+};
+
+//#define DRM_MODE_BLEND_PREMULTI		0
+//#define DRM_MODE_BLEND_COVERAGE		1
+//#define DRM_MODE_BLEND_PIXEL_NONE	2
+
 struct FrameInfo_t
 {
 	bool useFSRLayer0;
@@ -297,7 +309,10 @@ struct FrameInfo_t
 		bool blackBorder;
 		bool applyColorMgmt; // drm only
 
+		AlphaBlendingMode_t eAlphaBlendingMode = ALPHA_BLENDING_MODE_PREMULTIPLIED;
+
 		std::shared_ptr<gamescope::BackendBlob> ctm;
+		std::shared_ptr<gamescope::BackendBlob> hdr_metadata_blob;
 
 		GamescopeAppTextureColorspace colorspace;
 
@@ -325,6 +340,9 @@ struct FrameInfo_t
 		}
 
 		bool viewConvertsToLinearAutomatically() const {
+			if (isYcbcr())
+				return true;
+
 			return colorspace == GAMESCOPE_APP_TEXTURE_COLORSPACE_LINEAR ||
 				colorspace == GAMESCOPE_APP_TEXTURE_COLORSPACE_SCRGB ||
 				colorspace == GAMESCOPE_APP_TEXTURE_COLORSPACE_PASSTHRU;
@@ -362,7 +380,7 @@ struct FrameInfo_t
 		uint32_t result = 0;
 		for (int i = 0; i < layerCount; i++)
 		{
-			result |= layers[ i ].colorspace << (i * GamescopeAppTextureColorspace_Bits);
+result |= layers[ i ].colorspace << (i * GamescopeAppTextureColorspace_Bits);
 		}
 		return result;
 	}
@@ -473,6 +491,14 @@ struct gamescope_color_mgmt_luts
 	bool HasLuts() const
 	{
 		return bHasLut3D && bHasLut1D;
+	}
+
+	void shutdown()
+	{
+		bHasLut1D = false;
+		bHasLut3D = false;
+		vk_lut1d = nullptr;
+		vk_lut3d = nullptr;
 	}
 
 	void reset()
@@ -781,7 +807,7 @@ public:
 	inline dev_t primaryDevId() {return m_drmPrimaryDevId;}
 	inline bool supportsFp16() {return m_bSupportsFp16;}
 
-	inline void *uploadBufferData(uint32_t size)
+	inline std::pair<void *, uint32_t> uploadBufferData(uint32_t size)
 	{
 		assert(size <= upload_buffer_size);
 
@@ -792,9 +818,11 @@ public:
 			waitIdle(false);
 		}
 
-		uint8_t *ptr = ((uint8_t*)m_uploadBufferData) + m_uploadBufferOffset;
+		uint32_t uOffset = m_uploadBufferOffset;
+
+		uint8_t *ptr = ((uint8_t*)m_uploadBufferData) + uOffset;
 		m_uploadBufferOffset += size;
-		return ptr;
+		return std::make_pair( ptr, uOffset );
 	}
 
 	#define VK_FUNC(x) PFN_vk##x x = nullptr;
@@ -851,10 +879,12 @@ protected:
 	std::unordered_map<PipelineInfo_t, VkPipeline> m_pipelineMap;
 	std::mutex m_pipelineMutex;
 
+	static constexpr uint32_t k_uMaxConcurrentSubmits = 8;
+
 	// currently just one set, no need to double buffer because we
 	// vkQueueWaitIdle after each submit.
 	// should be moved to the output if we are going to support multiple outputs
-	std::array<VkDescriptorSet, 3> m_descriptorSets;
+	std::array<VkDescriptorSet, k_uMaxConcurrentSubmits * 3> m_descriptorSets;
 	uint32_t m_currentDescriptorSet = 0;
 
 	VkBuffer m_uploadBuffer;
@@ -865,7 +895,7 @@ protected:
 	VkSemaphore m_scratchTimelineSemaphore;
 	std::atomic<uint64_t> m_submissionSeqNo = { 0 };
 	std::vector<std::unique_ptr<CVulkanCmdBuffer>> m_unusedCmdBufs;
-	std::unordered_map<uint64_t, std::unique_ptr<CVulkanCmdBuffer>> m_pendingCmdBufs;
+	std::map<uint64_t, std::unique_ptr<CVulkanCmdBuffer>> m_pendingCmdBufs;
 };
 
 struct TextureState

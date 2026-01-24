@@ -6,15 +6,6 @@ namespace gamescope
 {
 	class BackendBlob;
 
-	enum GamescopeKnownDisplays
-	{
-		GAMESCOPE_KNOWN_DISPLAY_UNKNOWN,
-		GAMESCOPE_KNOWN_DISPLAY_STEAM_DECK_LCD,      // Jupiter
-		GAMESCOPE_KNOWN_DISPLAY_STEAM_DECK_LCD_DHD,  // Jupiter Deck HD
-		GAMESCOPE_KNOWN_DISPLAY_STEAM_DECK_OLED_SDC, // Galileo SDC
-		GAMESCOPE_KNOWN_DISPLAY_STEAM_DECK_OLED_BOE, // Galileo BOE
-	};
-
 	enum GamescopeModeGeneration
 	{
 		GAMESCOPE_MODE_GENERATE_CVT,
@@ -38,6 +29,7 @@ enum GamescopeAppTextureColorspace
 	GAMESCOPE_APP_TEXTURE_COLORSPACE_HDR10_PQ,
 	GAMESCOPE_APP_TEXTURE_COLORSPACE_PASSTHRU,
 };
+const uint32_t GamescopeAppTextureColorspace_Count = 5;
 const uint32_t GamescopeAppTextureColorspace_Bits = 3;
 
 inline bool ColorspaceIsHDR( GamescopeAppTextureColorspace colorspace )
